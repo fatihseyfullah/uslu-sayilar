@@ -46,7 +46,7 @@
             z-index: 10;
         }
         
-        #score, #lives, #level {
+        #score, #lives, #level, #questions-count {
             margin-bottom: 5px;
             background: rgba(0, 0, 0, 0.5);
             padding: 5px 10px;
@@ -134,6 +134,21 @@
             padding: 8px;
             border-radius: 8px;
         }
+        
+        .question-block {
+            width: 40px;
+            height: 40px;
+            background: #FFD700;
+            border: 2px solid #CC9900;
+            border-radius: 5px;
+            position: absolute;
+            animation: bounce 1s infinite alternate;
+        }
+        
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-5px); }
+        }
     </style>
 </head>
 <body>
@@ -144,6 +159,7 @@
             <div id="score">Puan: 0</div>
             <div id="lives">Can: 3</div>
             <div id="level">Seviye: 1</div>
+            <div id="questions-count">Sorular: 0/3</div>
         </div>
         
         <div id="question-popup">
@@ -164,11 +180,12 @@
             <h2>Tebrikler!</h2>
             <p>Seviyeyi Tamamladın!</p>
             <p>Kazandığın Puan: <span id="level-score">0</span></p>
+            <p>Doğru Çözülen Sorular: <span id="correct-questions">0</span>/3</p>
             <button id="next-level-btn">Sonraki Seviye</button>
         </div>
         
         <div id="instructions">
-            Yön Tuşları: Hareket | Boşluk: Zıpla
+            Yön Tuşları: Hareket | Boşluk: Zıpla | Soru Bloklarına Zıplayarak Soruları Aç
         </div>
     </div>
 
@@ -186,8 +203,10 @@
         const scoreElement = document.getElementById('score');
         const livesElement = document.getElementById('lives');
         const levelElement = document.getElementById('level');
+        const questionsCountElement = document.getElementById('questions-count');
         const finalScoreElement = document.getElementById('final-score');
         const levelScoreElement = document.getElementById('level-score');
+        const correctQuestionsElement = document.getElementById('correct-questions');
         
         // Oyun durumu
         let gameState = {
@@ -197,6 +216,8 @@
             isGameOver: false,
             isLevelComplete: false,
             currentQuestion: null,
+            questionsAnswered: 0,
+            questionsCorrect: 0,
             player: {
                 x: 50,
                 y: 350,
@@ -212,6 +233,7 @@
             platforms: [],
             coins: [],
             enemies: [],
+            questionBlocks: [],
             keys: {
                 left: false,
                 right: false,
@@ -225,8 +247,11 @@
         
         // Üslü sayı soruları
         const questions = [
+            { base: 1, exponent: 2, answer: 1, wrongAnswers: [2, 3, 4] },
+            { base: 1, exponent: 5, answer: 1, wrongAnswers: [5, 10, 15] },
             { base: 2, exponent: 2, answer: 4, wrongAnswers: [3, 5, 6] },
             { base: 2, exponent: 3, answer: 8, wrongAnswers: [6, 9, 10] },
+            { base: 2, exponent: 4, answer: 16, wrongAnswers: [8, 12, 20] },
             { base: 3, exponent: 2, answer: 9, wrongAnswers: [6, 8, 12] },
             { base: 3, exponent: 3, answer: 27, wrongAnswers: [9, 18, 24] },
             { base: 4, exponent: 2, answer: 16, wrongAnswers: [8, 12, 20] },
@@ -236,7 +261,8 @@
             { base: 6, exponent: 2, answer: 36, wrongAnswers: [12, 24, 30] },
             { base: 6, exponent: 3, answer: 216, wrongAnswers: [36, 108, 180] },
             { base: 10, exponent: 2, answer: 100, wrongAnswers: [20, 50, 200] },
-            { base: 10, exponent: 3, answer: 1000, wrongAnswers: [100, 500, 2000] }
+            { base: 10, exponent: 3, answer: 1000, wrongAnswers: [100, 500, 2000] },
+            { base: 10, exponent: 4, answer: 10000, wrongAnswers: [1000, 5000, 20000] }
         ];
         
         // Oyunu başlat
@@ -264,6 +290,9 @@
             gameState.platforms = [];
             gameState.coins = [];
             gameState.enemies = [];
+            gameState.questionBlocks = [];
+            gameState.questionsAnswered = 0;
+            gameState.questionsCorrect = 0;
             
             // Zemin
             gameState.platforms.push({ x: 0, y: 450, width: 2000, height: 50 });
@@ -278,6 +307,11 @@
             gameState.platforms.push({ x: 1400, y: 250, width: 100, height: 20 });
             gameState.platforms.push({ x: 1600, y: 300, width: 100, height: 20 });
             gameState.platforms.push({ x: 1800, y: 350, width: 100, height: 20 });
+            
+            // Soru blokları (en az 3 tane)
+            gameState.questionBlocks.push({ x: 250, y: 310, width: 40, height: 40, used: false });
+            gameState.questionBlocks.push({ x: 650, y: 210, width: 40, height: 40, used: false });
+            gameState.questionBlocks.push({ x: 1050, y: 110, width: 40, height: 40, used: false });
             
             // Coin'ler
             for (let i = 0; i < 15; i++) {
@@ -311,6 +345,9 @@
             // Kamerayı sıfırla
             gameState.camera.x = 0;
             gameState.camera.y = 0;
+            
+            // UI'ı güncelle
+            updateUI();
         }
         
         // Tuş basma olayı
@@ -378,6 +415,18 @@
                 }
             }
             
+            // Soru bloklarına çarpma
+            for (const block of gameState.questionBlocks) {
+                if (!block.used && checkCollision(gameState.player, block)) {
+                    // Bloktan aşağıya zıplama - soruyu tetikle
+                    if (gameState.player.velocityY > 0 && gameState.player.y < block.y) {
+                        block.used = true;
+                        showRandomQuestion();
+                        gameState.player.velocityY = -gameState.player.jumpPower / 2;
+                    }
+                }
+            }
+            
             // Coin toplama
             for (const coin of gameState.coins) {
                 if (!coin.collected && checkCollision(gameState.player, coin)) {
@@ -417,13 +466,8 @@
             gameState.camera.x = gameState.player.x - canvas.width / 2;
             
             // Seviye tamamlama kontrolü
-            if (gameState.player.x > 1900) {
+            if (gameState.player.x > 1900 && gameState.questionsAnswered >= 3) {
                 completeLevel();
-            }
-            
-            // Rastgele soru göster
-            if (Math.random() < 0.005 && !questionPopup.style.display) {
-                showRandomQuestion();
             }
         }
         
@@ -496,10 +540,12 @@
         // Cevabı kontrol et
         function checkAnswer(selectedAnswer) {
             questionPopup.style.display = 'none';
+            gameState.questionsAnswered++;
             
             if (selectedAnswer === gameState.currentQuestion.answer) {
                 // Doğru cevap - bonus puan
                 gameState.score += 50;
+                gameState.questionsCorrect++;
                 updateUI();
             } else {
                 // Yanlış cevap - can kaybı
@@ -509,12 +555,16 @@
                     gameOver();
                 }
             }
+            
+            // Soru sayısını güncelle
+            questionsCountElement.textContent = `Sorular: ${gameState.questionsAnswered}/3`;
         }
         
         // Seviyeyi tamamla
         function completeLevel() {
             gameState.isLevelComplete = true;
             levelScoreElement.textContent = gameState.score;
+            correctQuestionsElement.textContent = gameState.questionsCorrect;
             levelCompleteScreen.style.display = 'block';
         }
         
@@ -541,6 +591,8 @@
             gameState.level = 1;
             gameState.isGameOver = false;
             gameState.isLevelComplete = false;
+            gameState.questionsAnswered = 0;
+            gameState.questionsCorrect = 0;
             gameOverScreen.style.display = 'none';
             levelCompleteScreen.style.display = 'none';
             levelElement.textContent = `Seviye: ${gameState.level}`;
@@ -552,6 +604,7 @@
         function updateUI() {
             scoreElement.textContent = `Puan: ${gameState.score}`;
             livesElement.textContent = `Can: ${gameState.lives}`;
+            questionsCountElement.textContent = `Sorular: ${gameState.questionsAnswered}/3`;
         }
         
         // Oyunu çiz
@@ -572,6 +625,23 @@
                 ctx.fillStyle = '#7CFC00';
                 ctx.fillRect(platform.x, platform.y, platform.width, 5);
                 ctx.fillStyle = '#8B4513';
+            }
+            
+            // Soru bloklarını çiz
+            for (const block of gameState.questionBlocks) {
+                if (!block.used) {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fillRect(block.x, block.y, block.width, block.height);
+                    
+                    // Soru işareti
+                    ctx.fillStyle = '#000000';
+                    ctx.font = '20px Arial';
+                    ctx.fillText('?', block.x + 15, block.y + 25);
+                } else {
+                    // Kullanılmış blok
+                    ctx.fillStyle = '#A9A9A9';
+                    ctx.fillRect(block.x, block.y, block.width, block.height);
+                }
             }
             
             // Coin'leri çiz
