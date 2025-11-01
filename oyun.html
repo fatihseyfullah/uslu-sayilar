@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Üs Zıplaması: Matematik Platformer</title>
+    <style>
+        /* CSS: Oyun container'ı ve Skorbord için */
+        body { 
+            margin: 0; 
+            background-color: #333; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 20px;
+        }
+        #game-info {
+            font-family: Arial, sans-serif;
+            color: white;
+            padding: 10px;
+            width: 800px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center; /* Butonu ortalamak için */
+            margin-bottom: 10px;
+        }
+        #restart-button {
+            padding: 10px 15px;
+            cursor: pointer;
+            background-color: #ff9800;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        #restart-button:hover {
+            background-color: #f57c00;
+        }
+        #leaderboard-container {
+            font-family: Arial, sans-serif;
+            width: 800px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            margin-top: 20px;
+        }
+        #leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        #leaderboard-table th, #leaderboard-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        #leaderboard-table th {
+            background-color: #3f51b5;
+            color: white;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+</head>
+<body>
+
+<div id="game-info">
+    <div>**Puan:** <span id="score-text">0</span></div>
+    
+    <button id="restart-button" onclick="initGame()">YENİ OYUN BAŞLAT</button>
+    
+    <div>**Süre:** <span id="timer-text">0</span> sn</div>
+</div>
+
+<div id="phaser-game"></div>
+
+<div id="leaderboard-container">
+    <h3>🏆 Liderlik Tablosu 🏆</h3>
+    <table id="leaderboard-table">
+        <thead>
+            <tr><th>Sıra</th><th>Oyuncu</th><th>Puan</th><th>Süre (sn)</th></tr>
+        </thead>
+        <tbody id="leaderboard-body">
+            </tbody>
+    </table>
+</div>
+
+<script>
+    // --- OYUN AYARLARI ---
+    const BASE_NUMBERS = [1, 2, 3, 4, 5, 6, 10];
+    const EXPONENT_NUMBERS = [1, 2, 3];
+    const PLATFORM_COUNT = 4;
+
+    // --- OYUN DEĞİŞKENLERİ ---
+    let score = 0;
+    let startTime;
+    let timerInterval;
+    let currentCorrectAnswer = 0;
+    let currentQuestionText = '';
+    // Liderlik tablosu verilerini tarayıcıda depolamak için basit bir dizi
+    let leaderboard = JSON.parse(localStorage.getItem('us_leaderboard')) || [];
+
+    // --- DOM ELEMENTLERİ ---
+    const scoreTextElement = document.getElementById('score-text');
+    const timerTextElement = document.getElementById('timer-text');
+    const leaderboardBody = document.getElementById('leaderboard-body');
+    
+    // --- PHASER DEĞİŞKENLERİ ---
+    let player;
+    let platforms; // Tüm statik platformlar (Zemin dahil)
+    let cursors;
+    let questionTextObject;
+    let platformTexts = []; // Platformlardaki metinleri tutmak için
+
+    // --- YARDIMCI FONKSİYONLAR ---
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function calculatePower(base, exponent) {
+        return Math.pow(base, exponent);
+    }
+    
+    // Rastgele platform pozisyonları üretir
+    function generatePlatformPositions() {
+        const y_positions = [200, 300, 400, 500];
+        const x_positions = [100, 300, 500, 700];
+        const combined = y_positions.map((y, i) => ({ x: x_positions[i], y: y, width: 100 }));
+        return combined.sort(() => Math.random() - 0.5); 
+    }
+
+    // --- OYUN MANTIK FONKSİYONLARI ---
+    
+    function startTimer() {
+        startTime = Date.now();
+        timerInterval = setInterval(() => {
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            timerTextElement.textContent = elapsedTime;
+        }, 1000);
+    }
+    
+    function updateScoreDisplay(points) {
+        score += points;
+        scoreTextElement.textContent = score;
+    }
+    
+    // Yeni bir soru ve platform setini oluşturur
+    function generateNewQuestionSet(scene) {
+        
+        // [DÜZELTME] Sadece soru platformlarını temizle (Zemini bırak)
+        platformTexts.forEach(text => text.destroy());
+        platformTexts = []; 
+        
+        platforms.getChildren().forEach(p => {
+            // Zemin olmayan (yani soru) platformlarını sil
+            if (!p.getData('isGround')) {
+                platforms.remove(p);
+                p.destroy();
+            }
+        });
+
+        // Soru ve Cevap Üretimi
+        const base = BASE_NUMBERS[getRandomInt(0, BASE_NUMBERS.length - 1)];
+        const exponent = EXPONENT_NUMBERS[getRandomInt(0, EXPONENT_NUMBERS.length - 1)];
+        currentCorrectAnswer = calculatePower(base, exponent);
+        
+        currentQuestionText = `${base}<sup>${exponent}</sup> Kaçtır?`;
+        questionTextObject.setText(currentQuestionText);
+
+        let options = [currentCorrectAnswer];
+        while (options.length < PLATFORM_COUNT) {
+            let fakeAnswer;
+            fakeAnswer = currentCorrectAnswer + getRandomInt(-5, 5); 
+            
+            if (fakeAnswer > 0 && !options.includes(fakeAnswer)) {
+                options.push(fakeAnswer);
+            }
+        }
+        options.sort(() => Math.random() - 0.5);
+
+        // Platformları ve cevap metinlerini oluştur
+        const positions = generatePlatformPositions();
+        
+        options.forEach((option, index) => {
+            const pos = positions[index];
+            
+            // Platform objesi
+            const platform = scene.add.rectangle(pos.x, pos.y, pos.width, 30, 0xFFA500); 
+            scene.physics.add.existing(platform, true); 
+            platform.answer = option; // Cevabı sakla
+            platform.setData('isGround', false); // Soru platformu bayrağı
+
+            // Platform üzerindeki metin
+            const text = scene.add.text(pos.x, pos.y - 5, option, { 
+                fontSize: '18px', 
+                fill: '#000', 
+                align: 'center' 
+            }).setOrigin(0.5);
+
+            platforms.add(platform);
+            platformTexts.push(text);
+        });
+        
+        // Karakteri başlangıç pozisyonuna taşı
+        player.body.reset(100, 500);
+        player.body.setVelocity(0, 0);
+    }
+    
+    // Karakter platforma çarptığında çalışır
+    function hitPlatform(player, platform) {
+        if (player.body.touching.down && !platform.getData('isGround')) {
+            checkAnswer(platform.answer);
+        }
+    }
+    
+    // Cevabı kontrol eder
+    function checkAnswer(selectedAnswer) {
+        const scene = game.scene.scenes[0];
+        
+        if (player.isCheckingAnswer) return; 
+        player.isCheckingAnswer = true;
+
+        if (selectedAnswer === currentCorrectAnswer) {
+            updateScoreDisplay(100);
+            scene.cameras.main.flash(200, 0, 255, 0);
+            
+            setTimeout(() => {
+                player.isCheckingAnswer = false;
+                generateNewQuestionSet(scene);
+            }, 300);
+            
+        } else {
+            updateScoreDisplay(-50);
+            scene.cameras.main.shake(200, 0.02);
+            
+            setTimeout(() => {
+                player.isCheckingAnswer = false;
+            }, 500);
+        }
+    }
+
+    // Oyunu bitirir ve skorbordu günceller
+    function endGame() {
+        clearInterval(timerInterval);
+        const finalTime = timerTextElement.textContent;
+        
+        let playerName = prompt(`Oyun Bitti! ${score} puanla tamamladın. Adını girerek Liderlik Tablosuna kaydol:`);
+        if (!playerName || playerName.trim() === "") {
+             playerName = "Anonim";
+        }
+        
+        const newScore = { name: playerName, score: score, time: parseInt(finalTime) };
+        leaderboard.push(newScore);
+        
+        leaderboard.sort((a, b) => {
+            if (b.score !== a.score) {
+                return b.score - a.score;
+            } else {
+                return a.time - b.time;
+            }
+        });
+        
+        localStorage.setItem('us_leaderboard', JSON.stringify(leaderboard));
+
+        renderLeaderboard();
+        
+        questionTextObject.setText("Oyun Bitti! Yeni Oyun Başlıyor...");
+        game.isRunning = false;
+    }
+    
+    // Liderlik Tablosunu HTML'e yazar
+    function renderLeaderboard() {
+        leaderboardBody.innerHTML = '';
+        leaderboard.slice(0, 10).forEach((entry, index) => { 
+            const row = leaderboardBody.insertRow();
+            row.insertCell().textContent = index + 1;
+            row.insertCell().textContent = entry.name;
+            row.insertCell().textContent = entry.score;
+            row.insertCell().textContent = entry.time;
+        });
+    }
+    
+    // --- PHASER ANA FONKSİYONLARI ---
+    
+    const config = {
+        type: Phaser.AUTO,
+        width: 800,
+        height: 600,
+        parent: 'phaser-game',
+        physics: {
+            default: 'arcade',
+            arcade: {
+                gravity: { y: 600 },
+                debug: false 
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
+    };
+    
+    const game = new Phaser.Game(config);
+
+    function preload() {
+        this.load.spritesheet('karakter', 'https://labs.phaser.io/assets/sprites/dude.png', { frameWidth: 32, frameHeight: 48 });
+    }
+
+    function create() {
+        // Arkaplan
+        this.add.rectangle(400, 300, 800, 600, 0x87CEEB); 
+
+        // Platformlar grubunu oluştur
+        platforms = this.physics.add.staticGroup();
+        
+        // [DÜZELTME] Zemin Platformu (Sabit) ve bayrak
+        const ground = this.add.rectangle(400, 595, 800, 30, 0x4CAF50);
+        this.physics.add.existing(ground, true);
+        ground.setData('isGround', true); // Zemin platformu olduğunu işaretle
+        platforms.add(ground);
+
+
+        // Karakter (Sprite olarak)
+        player = this.physics.add.sprite(100, 500, 'karakter'); 
+        player.setBounce(0.2); 
+        player.setCollideWorldBounds(true); 
+        player.isCheckingAnswer = false; 
+
+        // [DÜZELTME] Karakter ve Platformlar arasında çarpışmayı burada ayarla
+        this.physics.add.collider(player, platforms, hitPlatform, null, this);
+
+
+        // Karakter Animasyonlarını Tanımla
+        this.anims.create({ key: 'left', frames: this.anims.generateFrameNumbers('karakter', { start: 0, end: 3 }), frameRate: 10, repeat: -1 });
+        this.anims.create({ key: 'turn', frames: [ { key: 'karakter', frame: 4 } ], frameRate: 20 });
+        this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('karakter', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
+        
+        // Soru Metni
+        questionTextObject = this.add.text(400, 50, '', { 
+            fontSize: '32px', 
+            fill: '#ffffff', 
+            backgroundColor: '#00008B', 
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5).setDepth(1); 
+
+        // Klavye Kontrolcüsü
+        cursors = this.input.keyboard.createCursorKeys();
+        
+        // Oyunu Başlat
+        initGame();
+    }
+    
+    function update() {
+        if (!game.isRunning) return; // Oyun bitmişse güncelleme yapma
+
+        if (player.isCheckingAnswer) {
+             player.setVelocityX(0);
+             return; 
+        }
+        
+        // 1. Yatay Hareket ve Animasyonlar
+        if (cursors.left.isDown) {
+            player.setVelocityX(-160);
+            player.anims.play('left', true);
+        } else if (cursors.right.isDown) {
+            player.setVelocityX(160);
+            player.anims.play('right', true);
+        } else {
+            player.setVelocityX(0);
+            player.anims.play('turn');
+        }
+
+        // 2. Zıplama
+        if (cursors.up.isDown && player.body.touching.down) {
+            player.setVelocityY(-400); 
+        }
+        
+        // 3. Düşme kontrolü
+        if (player.y > 650) { 
+             updateScoreDisplay(-100);
+             player.body.reset(100, 500); 
+        }
+
+        // 4. Kazanma Kontrolü (1500 puana ulaşınca bitir)
+        if (score >= 1500) {
+            endGame();
+        }
+    }
+    
+    // Tüm değişkenleri sıfırlayarak yeni bir oyun başlatır
+    function initGame() {
+        score = 0;
+        updateScoreDisplay(0);
+        timerTextElement.textContent = 0;
+        clearInterval(timerInterval);
+        game.isRunning = true;
+        
+        startTimer();
+        // Sahneyi alıp soru setini oluştur
+        const scene = game.scene.scenes[0];
+        generateNewQuestionSet(scene); 
+        
+        renderLeaderboard();
+    }
+
+</script>
+
+</body>
+</html>
