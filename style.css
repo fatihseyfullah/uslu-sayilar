@@ -1,0 +1,121 @@
+/* Genel Stil */
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #e0f7fa; /* Açık Mavi Tema */
+    color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    background-color: #fff;
+    border-radius: 15px;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+    max-width: 600px;
+    width: 100%;
+    text-align: center;
+}
+
+h1 {
+    color: #00bcd4; /* Turkuaz */
+    margin-bottom: 20px;
+}
+
+/* Başlık ve Skor Alanı */
+.header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 25px;
+    font-size: 1.2em;
+    font-weight: bold;
+    padding: 10px;
+    background-color: #b2ebf2;
+    border-radius: 8px;
+}
+
+/* Soru Kartı */
+.card {
+    background-color: #80deea;
+    color: #004d40;
+    padding: 40px 20px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    font-size: 2.5em;
+    font-weight: bold;
+    min-height: 80px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Cevap Seçenekleri */
+.options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* İki sütunlu düzen */
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.answer-button {
+    background-color: #00acc1; /* Mavi */
+    color: #fff;
+    border: none;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 1.4em;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.answer-button:hover {
+    background-color: #0097a7;
+    transform: scale(1.02);
+}
+
+/* Geri Bildirim ve Durum Renkleri */
+.correct {
+    background-color: #66bb6a !important; /* Yeşil */
+    transform: scale(1.05);
+}
+
+.wrong {
+    background-color: #ef5350 !important; /* Kırmızı */
+}
+
+.feedback-message {
+    font-size: 1.5em;
+    font-weight: bold;
+    min-height: 30px;
+    margin-bottom: 15px;
+}
+
+/* Sonraki Soru Butonu */
+#next-button {
+    background-color: #ffb300; /* Turuncu */
+    color: #fff;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-size: 1.2em;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#next-button:hover {
+    background-color: #ffa000;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Üslü Sayı Gösterimi için özel stil */
+sup {
+    font-size: 0.6em; /* Üs küçük görünsün */
+    vertical-align: super;
+}
