@@ -2,409 +2,636 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Üs Zıplaması: Matematik Platformer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Üslü Sayı Macerası</title>
     <style>
-        /* CSS: Oyun container'ı ve Skorbord için */
-        body { 
-            margin: 0; 
-            background-color: #333; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            padding: 20px;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        #game-info {
-            font-family: Arial, sans-serif;
-            color: white;
-            padding: 10px;
-            width: 800px;
+        
+        body {
+            background: linear-gradient(to bottom, #87CEEB, #1E90FF);
+            font-family: 'Arial Rounded MT Bold', 'Arial', sans-serif;
+            overflow: hidden;
+            height: 100vh;
             display: flex;
-            justify-content: space-between;
-            align-items: center; /* Butonu ortalamak için */
-            margin-bottom: 10px;
+            justify-content: center;
+            align-items: center;
         }
-        #restart-button {
-            padding: 10px 15px;
-            cursor: pointer;
-            background-color: #ff9800;
+        
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 500px;
+            border: 4px solid #333;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        #game-canvas {
+            background: linear-gradient(to bottom, #87CEEB, #1E90FF);
+            display: block;
+        }
+        
+        #ui-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 18px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+        
+        #score, #lives, #level {
+            margin-bottom: 5px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        
+        #question-popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            z-index: 20;
+            display: none;
+            width: 400px;
+        }
+        
+        #question-text {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .answer-option {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            background: #4CAF50;
             color: white;
             border: none;
-            border-radius: 5px;
-            font-weight: bold;
-            transition: background-color 0.2s;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background 0.3s;
         }
-        #restart-button:hover {
-            background-color: #f57c00;
+        
+        .answer-option:hover {
+            background: #45a049;
         }
-        #leaderboard-container {
-            font-family: Arial, sans-serif;
-            width: 800px;
-            background-color: #fff;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            padding: 20px;
-            margin-top: 20px;
-        }
-        #leaderboard-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        #leaderboard-table th, #leaderboard-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        #leaderboard-table th {
-            background-color: #3f51b5;
+        
+        #game-over, #level-complete {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
             color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            z-index: 30;
+            display: none;
+        }
+        
+        #restart-btn, #next-level-btn {
+            padding: 12px 24px;
+            margin-top: 20px;
+            background: #FF9800;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        #restart-btn:hover, #next-level-btn:hover {
+            background: #F57C00;
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px;
+            border-radius: 8px;
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
 </head>
 <body>
-
-<div id="game-info">
-    <div>**Puan:** <span id="score-text">0</span></div>
-    
-    <button id="restart-button" onclick="initGame()">YENİ OYUN BAŞLAT</button>
-    
-    <div>**Süre:** <span id="timer-text">0</span> sn</div>
-</div>
-
-<div id="phaser-game"></div>
-
-<div id="leaderboard-container">
-    <h3>🏆 Liderlik Tablosu 🏆</h3>
-    <table id="leaderboard-table">
-        <thead>
-            <tr><th>Sıra</th><th>Oyuncu</th><th>Puan</th><th>Süre (sn)</th></tr>
-        </thead>
-        <tbody id="leaderboard-body">
-            </tbody>
-    </table>
-</div>
-
-<script>
-    // --- OYUN AYARLARI ---
-    const BASE_NUMBERS = [1, 2, 3, 4, 5, 6, 10];
-    const EXPONENT_NUMBERS = [1, 2, 3];
-    const PLATFORM_COUNT = 4;
-
-    // --- OYUN DEĞİŞKENLERİ ---
-    let score = 0;
-    let startTime;
-    let timerInterval;
-    let currentCorrectAnswer = 0;
-    let currentQuestionText = '';
-    // Liderlik tablosu verilerini tarayıcıda depolamak için basit bir dizi
-    let leaderboard = JSON.parse(localStorage.getItem('us_leaderboard')) || [];
-
-    // --- DOM ELEMENTLERİ ---
-    const scoreTextElement = document.getElementById('score-text');
-    const timerTextElement = document.getElementById('timer-text');
-    const leaderboardBody = document.getElementById('leaderboard-body');
-    
-    // --- PHASER DEĞİŞKENLERİ ---
-    let player;
-    let platforms; // Tüm statik platformlar (Zemin dahil)
-    let cursors;
-    let questionTextObject;
-    let platformTexts = []; // Platformlardaki metinleri tutmak için
-
-    // --- YARDIMCI FONKSİYONLAR ---
-    function getRandomInt(min, max) {
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
-
-    function calculatePower(base, exponent) {
-        return Math.pow(base, exponent);
-    }
-    
-    // Rastgele platform pozisyonları üretir
-    function generatePlatformPositions() {
-        const y_positions = [200, 300, 400, 500];
-        const x_positions = [100, 300, 500, 700];
-        const combined = y_positions.map((y, i) => ({ x: x_positions[i], y: y, width: 100 }));
-        return combined.sort(() => Math.random() - 0.5); 
-    }
-
-    // --- OYUN MANTIK FONKSİYONLARI ---
-    
-    function startTimer() {
-        startTime = Date.now();
-        timerInterval = setInterval(() => {
-            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-            timerTextElement.textContent = elapsedTime;
-        }, 1000);
-    }
-    
-    function updateScoreDisplay(points) {
-        score += points;
-        scoreTextElement.textContent = score;
-    }
-    
-    // Yeni bir soru ve platform setini oluşturur
-    function generateNewQuestionSet(scene) {
+    <div id="game-container">
+        <canvas id="game-canvas" width="800" height="500"></canvas>
         
-        // [DÜZELTME] Sadece soru platformlarını temizle (Zemini bırak)
-        platformTexts.forEach(text => text.destroy());
-        platformTexts = []; 
+        <div id="ui-overlay">
+            <div id="score">Puan: 0</div>
+            <div id="lives">Can: 3</div>
+            <div id="level">Seviye: 1</div>
+        </div>
         
-        platforms.getChildren().forEach(p => {
-            // Zemin olmayan (yani soru) platformlarını sil
-            if (!p.getData('isGround')) {
-                platforms.remove(p);
-                p.destroy();
+        <div id="question-popup">
+            <div id="question-text">2³ kaçtır?</div>
+            <button class="answer-option" data-value="6">6</button>
+            <button class="answer-option" data-value="8">8</button>
+            <button class="answer-option" data-value="10">10</button>
+            <button class="answer-option" data-value="12">12</button>
+        </div>
+        
+        <div id="game-over">
+            <h2>Oyun Bitti!</h2>
+            <p>Toplam Puan: <span id="final-score">0</span></p>
+            <button id="restart-btn">Yeniden Başla</button>
+        </div>
+        
+        <div id="level-complete">
+            <h2>Tebrikler!</h2>
+            <p>Seviyeyi Tamamladın!</p>
+            <p>Kazandığın Puan: <span id="level-score">0</span></p>
+            <button id="next-level-btn">Sonraki Seviye</button>
+        </div>
+        
+        <div id="instructions">
+            Yön Tuşları: Hareket | Boşluk: Zıpla
+        </div>
+    </div>
+
+    <script>
+        // Oyun değişkenleri
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const questionPopup = document.getElementById('question-popup');
+        const questionText = document.getElementById('question-text');
+        const answerOptions = document.querySelectorAll('.answer-option');
+        const gameOverScreen = document.getElementById('game-over');
+        const levelCompleteScreen = document.getElementById('level-complete');
+        const restartBtn = document.getElementById('restart-btn');
+        const nextLevelBtn = document.getElementById('next-level-btn');
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const levelElement = document.getElementById('level');
+        const finalScoreElement = document.getElementById('final-score');
+        const levelScoreElement = document.getElementById('level-score');
+        
+        // Oyun durumu
+        let gameState = {
+            score: 0,
+            lives: 3,
+            level: 1,
+            isGameOver: false,
+            isLevelComplete: false,
+            currentQuestion: null,
+            player: {
+                x: 50,
+                y: 350,
+                width: 30,
+                height: 50,
+                velocityX: 0,
+                velocityY: 0,
+                isJumping: false,
+                speed: 5,
+                jumpPower: 12,
+                gravity: 0.5
+            },
+            platforms: [],
+            coins: [],
+            enemies: [],
+            keys: {
+                left: false,
+                right: false,
+                up: false
+            },
+            camera: {
+                x: 0,
+                y: 0
             }
-        });
-
-        // Soru ve Cevap Üretimi
-        const base = BASE_NUMBERS[getRandomInt(0, BASE_NUMBERS.length - 1)];
-        const exponent = EXPONENT_NUMBERS[getRandomInt(0, EXPONENT_NUMBERS.length - 1)];
-        currentCorrectAnswer = calculatePower(base, exponent);
+        };
         
-        currentQuestionText = `${base}<sup>${exponent}</sup> Kaçtır?`;
-        questionTextObject.setText(currentQuestionText);
-
-        let options = [currentCorrectAnswer];
-        while (options.length < PLATFORM_COUNT) {
-            let fakeAnswer;
-            fakeAnswer = currentCorrectAnswer + getRandomInt(-5, 5); 
+        // Üslü sayı soruları
+        const questions = [
+            { base: 2, exponent: 2, answer: 4, wrongAnswers: [3, 5, 6] },
+            { base: 2, exponent: 3, answer: 8, wrongAnswers: [6, 9, 10] },
+            { base: 3, exponent: 2, answer: 9, wrongAnswers: [6, 8, 12] },
+            { base: 3, exponent: 3, answer: 27, wrongAnswers: [9, 18, 24] },
+            { base: 4, exponent: 2, answer: 16, wrongAnswers: [8, 12, 20] },
+            { base: 4, exponent: 3, answer: 64, wrongAnswers: [16, 32, 48] },
+            { base: 5, exponent: 2, answer: 25, wrongAnswers: [10, 20, 30] },
+            { base: 5, exponent: 3, answer: 125, wrongAnswers: [25, 75, 100] },
+            { base: 6, exponent: 2, answer: 36, wrongAnswers: [12, 24, 30] },
+            { base: 6, exponent: 3, answer: 216, wrongAnswers: [36, 108, 180] },
+            { base: 10, exponent: 2, answer: 100, wrongAnswers: [20, 50, 200] },
+            { base: 10, exponent: 3, answer: 1000, wrongAnswers: [100, 500, 2000] }
+        ];
+        
+        // Oyunu başlat
+        function initGame() {
+            // Platformları oluştur
+            createLevel();
             
-            if (fakeAnswer > 0 && !options.includes(fakeAnswer)) {
-                options.push(fakeAnswer);
+            // Olay dinleyicileri
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
+            restartBtn.addEventListener('click', restartGame);
+            nextLevelBtn.addEventListener('click', nextLevel);
+            
+            // Soru butonlarına tıklama olayı ekle
+            answerOptions.forEach(option => {
+                option.addEventListener('click', () => checkAnswer(parseInt(option.getAttribute('data-value'))));
+            });
+            
+            // Oyun döngüsünü başlat
+            gameLoop();
+        }
+        
+        // Seviye oluştur
+        function createLevel() {
+            gameState.platforms = [];
+            gameState.coins = [];
+            gameState.enemies = [];
+            
+            // Zemin
+            gameState.platforms.push({ x: 0, y: 450, width: 2000, height: 50 });
+            
+            // Platformlar
+            gameState.platforms.push({ x: 200, y: 350, width: 100, height: 20 });
+            gameState.platforms.push({ x: 400, y: 300, width: 100, height: 20 });
+            gameState.platforms.push({ x: 600, y: 250, width: 100, height: 20 });
+            gameState.platforms.push({ x: 800, y: 200, width: 100, height: 20 });
+            gameState.platforms.push({ x: 1000, y: 150, width: 100, height: 20 });
+            gameState.platforms.push({ x: 1200, y: 200, width: 100, height: 20 });
+            gameState.platforms.push({ x: 1400, y: 250, width: 100, height: 20 });
+            gameState.platforms.push({ x: 1600, y: 300, width: 100, height: 20 });
+            gameState.platforms.push({ x: 1800, y: 350, width: 100, height: 20 });
+            
+            // Coin'ler
+            for (let i = 0; i < 15; i++) {
+                gameState.coins.push({
+                    x: 150 + i * 120,
+                    y: 300 - Math.sin(i) * 50,
+                    width: 20,
+                    height: 20,
+                    collected: false
+                });
             }
-        }
-        options.sort(() => Math.random() - 0.5);
-
-        // Platformları ve cevap metinlerini oluştur
-        const positions = generatePlatformPositions();
-        
-        options.forEach((option, index) => {
-            const pos = positions[index];
             
-            // Platform objesi
-            const platform = scene.add.rectangle(pos.x, pos.y, pos.width, 30, 0xFFA500); 
-            scene.physics.add.existing(platform, true); 
-            platform.answer = option; // Cevabı sakla
-            platform.setData('isGround', false); // Soru platformu bayrağı
-
-            // Platform üzerindeki metin
-            const text = scene.add.text(pos.x, pos.y - 5, option, { 
-                fontSize: '18px', 
-                fill: '#000', 
-                align: 'center' 
-            }).setOrigin(0.5);
-
-            platforms.add(platform);
-            platformTexts.push(text);
-        });
-        
-        // Karakteri başlangıç pozisyonuna taşı
-        player.body.reset(100, 500);
-        player.body.setVelocity(0, 0);
-    }
-    
-    // Karakter platforma çarptığında çalışır
-    function hitPlatform(player, platform) {
-        if (player.body.touching.down && !platform.getData('isGround')) {
-            checkAnswer(platform.answer);
-        }
-    }
-    
-    // Cevabı kontrol eder
-    function checkAnswer(selectedAnswer) {
-        const scene = game.scene.scenes[0];
-        
-        if (player.isCheckingAnswer) return; 
-        player.isCheckingAnswer = true;
-
-        if (selectedAnswer === currentCorrectAnswer) {
-            updateScoreDisplay(100);
-            scene.cameras.main.flash(200, 0, 255, 0);
+            // Düşmanlar
+            for (let i = 0; i < 5; i++) {
+                gameState.enemies.push({
+                    x: 300 + i * 300,
+                    y: 430,
+                    width: 30,
+                    height: 20,
+                    speed: 2,
+                    direction: 1
+                });
+            }
             
-            setTimeout(() => {
-                player.isCheckingAnswer = false;
-                generateNewQuestionSet(scene);
-            }, 300);
+            // Oyuncuyu başlangıç konumuna yerleştir
+            gameState.player.x = 50;
+            gameState.player.y = 350;
+            gameState.player.velocityX = 0;
+            gameState.player.velocityY = 0;
             
-        } else {
-            updateScoreDisplay(-50);
-            scene.cameras.main.shake(200, 0.02);
-            
-            setTimeout(() => {
-                player.isCheckingAnswer = false;
-            }, 500);
-        }
-    }
-
-    // Oyunu bitirir ve skorbordu günceller
-    function endGame() {
-        clearInterval(timerInterval);
-        const finalTime = timerTextElement.textContent;
-        
-        let playerName = prompt(`Oyun Bitti! ${score} puanla tamamladın. Adını girerek Liderlik Tablosuna kaydol:`);
-        if (!playerName || playerName.trim() === "") {
-             playerName = "Anonim";
+            // Kamerayı sıfırla
+            gameState.camera.x = 0;
+            gameState.camera.y = 0;
         }
         
-        const newScore = { name: playerName, score: score, time: parseInt(finalTime) };
-        leaderboard.push(newScore);
+        // Tuş basma olayı
+        function handleKeyDown(e) {
+            if (e.key === 'ArrowLeft') gameState.keys.left = true;
+            if (e.key === 'ArrowRight') gameState.keys.right = true;
+            if (e.key === 'ArrowUp' || e.key === ' ') gameState.keys.up = true;
+        }
         
-        leaderboard.sort((a, b) => {
-            if (b.score !== a.score) {
-                return b.score - a.score;
+        // Tuş bırakma olayı
+        function handleKeyUp(e) {
+            if (e.key === 'ArrowLeft') gameState.keys.left = false;
+            if (e.key === 'ArrowRight') gameState.keys.right = false;
+            if (e.key === 'ArrowUp' || e.key === ' ') gameState.keys.up = false;
+        }
+        
+        // Oyuncuyu güncelle
+        function updatePlayer() {
+            // Yatay hareket
+            if (gameState.keys.left) {
+                gameState.player.velocityX = -gameState.player.speed;
+            } else if (gameState.keys.right) {
+                gameState.player.velocityX = gameState.player.speed;
             } else {
-                return a.time - b.time;
+                gameState.player.velocityX = 0;
             }
-        });
-        
-        localStorage.setItem('us_leaderboard', JSON.stringify(leaderboard));
-
-        renderLeaderboard();
-        
-        questionTextObject.setText("Oyun Bitti! Yeni Oyun Başlıyor...");
-        game.isRunning = false;
-    }
-    
-    // Liderlik Tablosunu HTML'e yazar
-    function renderLeaderboard() {
-        leaderboardBody.innerHTML = '';
-        leaderboard.slice(0, 10).forEach((entry, index) => { 
-            const row = leaderboardBody.insertRow();
-            row.insertCell().textContent = index + 1;
-            row.insertCell().textContent = entry.name;
-            row.insertCell().textContent = entry.score;
-            row.insertCell().textContent = entry.time;
-        });
-    }
-    
-    // --- PHASER ANA FONKSİYONLARI ---
-    
-    const config = {
-        type: Phaser.AUTO,
-        width: 800,
-        height: 600,
-        parent: 'phaser-game',
-        physics: {
-            default: 'arcade',
-            arcade: {
-                gravity: { y: 600 },
-                debug: false 
+            
+            // Zıplama
+            if (gameState.keys.up && !gameState.player.isJumping) {
+                gameState.player.velocityY = -gameState.player.jumpPower;
+                gameState.player.isJumping = true;
             }
-        },
-        scene: {
-            preload: preload,
-            create: create,
-            update: update
+            
+            // Yerçekimi
+            gameState.player.velocityY += gameState.player.gravity;
+            
+            // Yeni pozisyon
+            gameState.player.x += gameState.player.velocityX;
+            gameState.player.y += gameState.player.velocityY;
+            
+            // Platform çarpışması
+            let onGround = false;
+            for (const platform of gameState.platforms) {
+                if (checkCollision(gameState.player, platform)) {
+                    // Alt çarpışma
+                    if (gameState.player.velocityY > 0 && gameState.player.y < platform.y) {
+                        gameState.player.y = platform.y - gameState.player.height;
+                        gameState.player.velocityY = 0;
+                        gameState.player.isJumping = false;
+                        onGround = true;
+                    }
+                    // Üst çarpışma
+                    else if (gameState.player.velocityY < 0 && gameState.player.y > platform.y) {
+                        gameState.player.y = platform.y + platform.height;
+                        gameState.player.velocityY = 0;
+                    }
+                    // Yan çarpışma
+                    else if (gameState.player.velocityX !== 0) {
+                        if (gameState.player.velocityX > 0) {
+                            gameState.player.x = platform.x - gameState.player.width;
+                        } else {
+                            gameState.player.x = platform.x + platform.width;
+                        }
+                    }
+                }
+            }
+            
+            // Coin toplama
+            for (const coin of gameState.coins) {
+                if (!coin.collected && checkCollision(gameState.player, coin)) {
+                    coin.collected = true;
+                    gameState.score += 10;
+                    updateUI();
+                }
+            }
+            
+            // Düşman çarpışması
+            for (const enemy of gameState.enemies) {
+                if (checkCollision(gameState.player, enemy)) {
+                    // Düşmanın üstüne zıplama
+                    if (gameState.player.velocityY > 0 && gameState.player.y < enemy.y) {
+                        enemy.y = 1000; // Ekran dışına at
+                        gameState.player.velocityY = -gameState.player.jumpPower / 1.5;
+                        gameState.score += 20;
+                        updateUI();
+                    } else {
+                        // Can kaybı
+                        gameState.lives--;
+                        updateUI();
+                        if (gameState.lives <= 0) {
+                            gameOver();
+                        } else {
+                            // Oyuncuyu başlangıç noktasına geri götür
+                            gameState.player.x = 50;
+                            gameState.player.y = 350;
+                            gameState.player.velocityX = 0;
+                            gameState.player.velocityY = 0;
+                        }
+                    }
+                }
+            }
+            
+            // Kamerayı güncelle
+            gameState.camera.x = gameState.player.x - canvas.width / 2;
+            
+            // Seviye tamamlama kontrolü
+            if (gameState.player.x > 1900) {
+                completeLevel();
+            }
+            
+            // Rastgele soru göster
+            if (Math.random() < 0.005 && !questionPopup.style.display) {
+                showRandomQuestion();
+            }
         }
-    };
-    
-    const game = new Phaser.Game(config);
-
-    function preload() {
-        this.load.spritesheet('karakter', 'https://labs.phaser.io/assets/sprites/dude.png', { frameWidth: 32, frameHeight: 48 });
-    }
-
-    function create() {
-        // Arkaplan
-        this.add.rectangle(400, 300, 800, 600, 0x87CEEB); 
-
-        // Platformlar grubunu oluştur
-        platforms = this.physics.add.staticGroup();
         
-        // [DÜZELTME] Zemin Platformu (Sabit) ve bayrak
-        const ground = this.add.rectangle(400, 595, 800, 30, 0x4CAF50);
-        this.physics.add.existing(ground, true);
-        ground.setData('isGround', true); // Zemin platformu olduğunu işaretle
-        platforms.add(ground);
-
-
-        // Karakter (Sprite olarak)
-        player = this.physics.add.sprite(100, 500, 'karakter'); 
-        player.setBounce(0.2); 
-        player.setCollideWorldBounds(true); 
-        player.isCheckingAnswer = false; 
-
-        // [DÜZELTME] Karakter ve Platformlar arasında çarpışmayı burada ayarla
-        this.physics.add.collider(player, platforms, hitPlatform, null, this);
-
-
-        // Karakter Animasyonlarını Tanımla
-        this.anims.create({ key: 'left', frames: this.anims.generateFrameNumbers('karakter', { start: 0, end: 3 }), frameRate: 10, repeat: -1 });
-        this.anims.create({ key: 'turn', frames: [ { key: 'karakter', frame: 4 } ], frameRate: 20 });
-        this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('karakter', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
+        // Düşmanları güncelle
+        function updateEnemies() {
+            for (const enemy of gameState.enemies) {
+                enemy.x += enemy.speed * enemy.direction;
+                
+                // Platform kenarlarında yön değiştir
+                let onPlatform = false;
+                for (const platform of gameState.platforms) {
+                    if (enemy.x + enemy.width > platform.x && enemy.x < platform.x + platform.width &&
+                        enemy.y + enemy.height >= platform.y && enemy.y < platform.y + platform.height) {
+                        onPlatform = true;
+                        break;
+                    }
+                }
+                
+                if (!onPlatform || enemy.x <= 0 || enemy.x + enemy.width >= 2000) {
+                    enemy.direction *= -1;
+                }
+            }
+        }
         
-        // Soru Metni
-        questionTextObject = this.add.text(400, 50, '', { 
-            fontSize: '32px', 
-            fill: '#ffffff', 
-            backgroundColor: '#00008B', 
-            padding: { x: 10, y: 5 }
-        }).setOrigin(0.5).setDepth(1); 
-
-        // Klavye Kontrolcüsü
-        cursors = this.input.keyboard.createCursorKeys();
+        // Çarpışma kontrolü
+        function checkCollision(obj1, obj2) {
+            return obj1.x < obj2.x + obj2.width &&
+                   obj1.x + obj1.width > obj2.x &&
+                   obj1.y < obj2.y + obj2.height &&
+                   obj1.y + obj1.height > obj2.y;
+        }
         
-        // Oyunu Başlat
+        // Rastgele soru göster
+        function showRandomQuestion() {
+            const randomIndex = Math.floor(Math.random() * questions.length);
+            gameState.currentQuestion = questions[randomIndex];
+            
+            // Soruyu hazırla
+            questionText.textContent = `${gameState.currentQuestion.base}${getSuperscript(gameState.currentQuestion.exponent)} kaçtır?`;
+            
+            // Cevapları karıştır
+            const answers = [gameState.currentQuestion.answer, ...gameState.currentQuestion.wrongAnswers];
+            shuffleArray(answers);
+            
+            // Butonlara cevapları yerleştir
+            answerOptions.forEach((option, index) => {
+                option.textContent = answers[index];
+                option.setAttribute('data-value', answers[index]);
+            });
+            
+            // Soru penceresini göster
+            questionPopup.style.display = 'block';
+        }
+        
+        // Üs için üst simge formatı oluştur
+        function getSuperscript(number) {
+            const superscripts = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
+            return number.toString().split('').map(digit => superscripts[digit]).join('');
+        }
+        
+        // Diziyi karıştır
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+        
+        // Cevabı kontrol et
+        function checkAnswer(selectedAnswer) {
+            questionPopup.style.display = 'none';
+            
+            if (selectedAnswer === gameState.currentQuestion.answer) {
+                // Doğru cevap - bonus puan
+                gameState.score += 50;
+                updateUI();
+            } else {
+                // Yanlış cevap - can kaybı
+                gameState.lives--;
+                updateUI();
+                if (gameState.lives <= 0) {
+                    gameOver();
+                }
+            }
+        }
+        
+        // Seviyeyi tamamla
+        function completeLevel() {
+            gameState.isLevelComplete = true;
+            levelScoreElement.textContent = gameState.score;
+            levelCompleteScreen.style.display = 'block';
+        }
+        
+        // Sonraki seviye
+        function nextLevel() {
+            gameState.level++;
+            gameState.isLevelComplete = false;
+            levelCompleteScreen.style.display = 'none';
+            levelElement.textContent = `Seviye: ${gameState.level}`;
+            createLevel();
+        }
+        
+        // Oyun bitti
+        function gameOver() {
+            gameState.isGameOver = true;
+            finalScoreElement.textContent = gameState.score;
+            gameOverScreen.style.display = 'block';
+        }
+        
+        // Oyunu yeniden başlat
+        function restartGame() {
+            gameState.score = 0;
+            gameState.lives = 3;
+            gameState.level = 1;
+            gameState.isGameOver = false;
+            gameState.isLevelComplete = false;
+            gameOverScreen.style.display = 'none';
+            levelCompleteScreen.style.display = 'none';
+            levelElement.textContent = `Seviye: ${gameState.level}`;
+            updateUI();
+            createLevel();
+        }
+        
+        // UI'ı güncelle
+        function updateUI() {
+            scoreElement.textContent = `Puan: ${gameState.score}`;
+            livesElement.textContent = `Can: ${gameState.lives}`;
+        }
+        
+        // Oyunu çiz
+        function draw() {
+            // Arkaplanı temizle
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Kamerayı uygula
+            ctx.save();
+            ctx.translate(-gameState.camera.x, -gameState.camera.y);
+            
+            // Platformları çiz
+            ctx.fillStyle = '#8B4513';
+            for (const platform of gameState.platforms) {
+                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                
+                // Platform üstü çim
+                ctx.fillStyle = '#7CFC00';
+                ctx.fillRect(platform.x, platform.y, platform.width, 5);
+                ctx.fillStyle = '#8B4513';
+            }
+            
+            // Coin'leri çiz
+            for (const coin of gameState.coins) {
+                if (!coin.collected) {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.arc(coin.x + coin.width/2, coin.y + coin.height/2, coin.width/2, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#FFA500';
+                    ctx.beginPath();
+                    ctx.arc(coin.x + coin.width/2, coin.y + coin.height/2, coin.width/4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            // Düşmanları çiz
+            for (const enemy of gameState.enemies) {
+                if (enemy.y < 500) { // Ekran dışına atılan düşmanları çizme
+                    ctx.fillStyle = '#FF0000';
+                    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                    
+                    // Gözler
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(enemy.x + 5, enemy.y + 5, 5, 5);
+                    ctx.fillRect(enemy.x + enemy.width - 10, enemy.y + 5, 5, 5);
+                }
+            }
+            
+            // Oyuncuyu çiz
+            ctx.fillStyle = '#0000FF';
+            ctx.fillRect(gameState.player.x, gameState.player.y, gameState.player.width, gameState.player.height);
+            
+            // Oyuncu yüzü
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(gameState.player.x + 20, gameState.player.y + 10, 5, 5);
+            
+            // Bitiş çizgisi
+            ctx.fillStyle = '#00FF00';
+            ctx.fillRect(1950, 400, 50, 50);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '20px Arial';
+            ctx.fillText('BİTİŞ', 1950, 390);
+            
+            ctx.restore();
+        }
+        
+        // Oyun döngüsü
+        function gameLoop() {
+            if (!gameState.isGameOver && !gameState.isLevelComplete) {
+                updatePlayer();
+                updateEnemies();
+                draw();
+            }
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Oyunu başlat
         initGame();
-    }
-    
-    function update() {
-        if (!game.isRunning) return; // Oyun bitmişse güncelleme yapma
-
-        if (player.isCheckingAnswer) {
-             player.setVelocityX(0);
-             return; 
-        }
-        
-        // 1. Yatay Hareket ve Animasyonlar
-        if (cursors.left.isDown) {
-            player.setVelocityX(-160);
-            player.anims.play('left', true);
-        } else if (cursors.right.isDown) {
-            player.setVelocityX(160);
-            player.anims.play('right', true);
-        } else {
-            player.setVelocityX(0);
-            player.anims.play('turn');
-        }
-
-        // 2. Zıplama
-        if (cursors.up.isDown && player.body.touching.down) {
-            player.setVelocityY(-400); 
-        }
-        
-        // 3. Düşme kontrolü
-        if (player.y > 650) { 
-             updateScoreDisplay(-100);
-             player.body.reset(100, 500); 
-        }
-
-        // 4. Kazanma Kontrolü (1500 puana ulaşınca bitir)
-        if (score >= 1500) {
-            endGame();
-        }
-    }
-    
-    // Tüm değişkenleri sıfırlayarak yeni bir oyun başlatır
-    function initGame() {
-        score = 0;
-        updateScoreDisplay(0);
-        timerTextElement.textContent = 0;
-        clearInterval(timerInterval);
-        game.isRunning = true;
-        
-        startTimer();
-        // Sahneyi alıp soru setini oluştur
-        const scene = game.scene.scenes[0];
-        generateNewQuestionSet(scene); 
-        
-        renderLeaderboard();
-    }
-
-</script>
-
+    </script>
 </body>
 </html>
